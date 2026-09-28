@@ -4,22 +4,26 @@ Session-scoped working memory for agent runs: store payloads during a tool loop,
 
 ## Install
 
-1. Install a Rust toolchain that meets `rust-version` in `Cargo.toml` (1.88 or newer).
-2. Clone this repository and work from its root.
+Install a Rust toolchain that meets `rust-version` in `Cargo.toml` (1.88 or newer).
 
-```bash
-git clone https://github.com/Bioto/notepad.git
-cd notepad
-```
+## Hard dependency
+
+[Superglue](https://github.com/Bioto/superglue) is a required path dependency. Clone it next to this repo before `cargo build` or `cargo test`. Cargo resolves that path even when the `superglue` feature is off.
+
+The `superglue` feature enables agent tools and offload hooks. The `synthesize` feature enables `NotepadSynthesizer` and turns the `superglue` feature on.
 
 ## Quick start
 
-The default build has no LLM dependencies.
-
 ```bash
+# parent/
+git clone https://github.com/Bioto/notepad.git
+git clone https://github.com/Bioto/superglue.git
+cd notepad
 cargo test
 cargo run --example notepad_demo
 ```
+
+`notepad_demo` does not call an LLM. The sibling checkout is still required.
 
 ## Optional features
 
@@ -29,13 +33,7 @@ cargo run --example notepad_demo
 | `superglue` | Agent tools, `OffloadHook`, `compact_tool_messages`, stub helpers |
 | `synthesize` | `NotepadSynthesizer` multi-pass LLM synthesis (implies `superglue`) |
 
-Features `superglue` and `synthesize` need a sibling checkout of [superglue](https://github.com/Bioto/superglue) so the path dependency `../superglue` resolves.
-
 ```bash
-# parent/
-git clone https://github.com/Bioto/notepad.git
-git clone https://github.com/Bioto/superglue.git
-cd notepad
 cargo test --features synthesize
 ```
 
