@@ -1,0 +1,17 @@
+[package]
+name = "notepad-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Shared notepad handle table for cross-binding superglue integration"
+publish = false
+
+[lib]
+name = "notepad_bridge"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+notepad = { path = "..", features = ["superglue"] }
+superglue = { path = "../../superglue" }
+tokio = { version = "1", features = ["sync"] }
+serde_json = "1"

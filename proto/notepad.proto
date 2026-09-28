@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package notepad;
+
+// ---------------------------------------------------------------------------
+// Core storage types
+// ---------------------------------------------------------------------------
+
+message StoredPayload {
+  oneof value {
+    string text = 1;
+    string json = 2;
+  }
+}
+
+message Entry {
+  string id = 1;
+  optional string label = 2;
+  repeated string tags = 3;
+  StoredPayload payload = 4;
+  /// Opaque JSON object string for arbitrary metadata.
+  string metadata_json = 5;
+  string created_at = 6;
+}
+
+enum RenderFormat {
+  RENDER_FORMAT_UNSPECIFIED = 0;
+  RENDER_FORMAT_MARKDOWN = 1;
+  RENDER_FORMAT_JSON = 2;
+}
+
+message RenderOptions {
+  RenderFormat format = 1;
+  bool include_metadata = 2;
+  optional uint32 max_chars = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Offload / stub
+// ---------------------------------------------------------------------------
+
+message OffloadConfig {
+  bool auto_offload = 1;
+  uint32 min_chars = 2;
+  repeated string always_offload_tools = 3;
+  repeated string never_offload_tools = 4;
+  uint32 preview_chars = 5;
+}
+
+message NotepadStub {
+  string notepad_ref = 1;
+  uint32 stored_chars = 2;
+  string tool = 3;
+  string preview = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Synthesis
+// ---------------------------------------------------------------------------
+
+message SynthesisConfig {
+  uint32 max_context_chars = 1;
+  float synthesis_budget_ratio = 2;
+  float extraction_budget_ratio = 3;
+  uint32 max_extraction_rounds = 4;
+}
+
+message SynthesisOutcome {
+  string answer = 1;
+  uint32 passes = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Tool IO (scratchpad agent tools)
+// ---------------------------------------------------------------------------
+
+message StoreRequest {
+  string content = 1;
+  optional string label = 2;
+  repeated string tags = 3;
+}
+
+message StoreResponse {
+  string id = 1;
+  uint32 stored_chars = 2;
+  string message = 3;
+}
+
+message ListRequest {
+  optional string tag = 1;
+}
+
+message ListEntryPreview {
+  string id = 1;
+  optional string label = 2;
+  repeated string tags = 3;
+  uint32 stored_chars = 4;
+  string preview = 5;
+}
+
+message ListResponse {
+  uint32 count = 1;
+  repeated ListEntryPreview entries = 2;
+}
+
+message ReadRequest {
+  string id = 1;
+}
+
+message ReadResponse {
+  string id = 1;
+  optional string label = 2;
+  repeated string tags = 3;
+  string content = 4;
+}
+
+message RemoveRequest {
+  string id = 1;
+}
+
+message RemoveResponse {
+  string removed = 1;
+  optional string label = 2;
+}

@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin>=1.4,<2"]
+build-backend = "maturin"
+
+[project]
+name = "notepad-py"
+version = "0.1.0"
+description = "Python bindings for the notepad Rust core (session working memory)"
+license = "BSD-4-Clause"
+requires-python = ">=3.12"
+
+[tool.maturin]
+module-name = "notepad._notepad"
+python-packages = ["notepad"]

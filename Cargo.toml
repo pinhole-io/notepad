@@ -1,0 +1,61 @@
+# Notepad monorepo: core + bindings share one version.
+# Bump `[workspace.package].version` here only.
+
+[workspace]
+resolver = "2"
+members = [
+    ".",
+    "notepad-bridge",
+    "notepad-js",
+    "notepad-py",
+    "notepad-kt/native",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "BSD-4-Clause"
+
+[profile.release]
+lto = true
+strip = true
+
+[package]
+name = "notepad"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Session working memory for agent runs — offload context, synthesize answers"
+rust-version = "1.88"
+
+[features]
+default = []
+superglue = ["dep:async-trait", "dep:tokio"]
+synthesize = ["superglue"]
+
+[build-dependencies]
+prost-build = "0.14"
+protoc-bin-vendored = "3"
+
+[dependencies]
+prost = "0.14"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+time = { version = "0.3", features = ["formatting", "parsing", "serde"] }
+uuid = { version = "1", features = ["v4", "v5", "serde"] }
+
+async-trait = { version = "0.1", optional = true }
+superglue = { path = "../superglue" }
+tokio = { version = "1", features = ["sync"], optional = true }
+
+[dev-dependencies]
+secrecy = "0.10"
+superglue = { path = "../superglue" }
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+wiremock = "0.6"
+
+[[example]]
+name = "notepad_demo"
+path = "examples/notepad_demo.rs"
