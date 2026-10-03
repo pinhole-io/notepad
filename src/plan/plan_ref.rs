@@ -1,7 +1,7 @@
 //! Stable short identifiers for persisted plans.
 
+use super::registry::PlanRegistry;
 use crate::plan::{Plan, PlanId};
-use crate::plan_registry::PlanRegistry;
 use uuid::Uuid;
 
 const ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";

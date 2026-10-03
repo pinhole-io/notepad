@@ -373,7 +373,7 @@ impl PlanDraft {
             .collect();
         Plan {
             id,
-            public_id: crate::plan_ref::public_id_for_plan_id(id),
+            public_id: super::plan_ref::public_id_for_plan_id(id),
             title: self.title,
             overview: self.overview,
             status: PlanStatus::Draft,

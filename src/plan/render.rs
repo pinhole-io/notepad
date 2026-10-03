@@ -1,5 +1,5 @@
+use super::task_ref::{task_ref_for_id, task_ref_for_task};
 use crate::plan::{Plan, TaskStatus};
-use crate::plan_task_ref::{task_ref_for_id, task_ref_for_task};
 
 /// Markdown layout for chat, logging, and the plan browser.
 #[must_use]

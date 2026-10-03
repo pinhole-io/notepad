@@ -10,8 +10,8 @@ use superglue::tools::{
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::artifact::{Artifact, ArtifactId};
-use crate::artifact_store::ArtifactStore;
+use super::store::ArtifactStore;
+use super::types::{Artifact, ArtifactId};
 
 pub const ARTIFACT_TOOL_NAME: &str = "artifact";
 

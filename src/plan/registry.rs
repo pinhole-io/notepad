@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+use super::plan_ref::{public_id_for_plan_id, public_id_for_plan_id_with_attempt};
 use crate::error::PlanError;
 use crate::plan::{NoteId, Plan, PlanDraft, PlanId, PlanNote, PlanStatus, TaskId, TaskStatus};
-use crate::plan_ref::{public_id_for_plan_id, public_id_for_plan_id_with_attempt};
 
 const REGISTRY_VERSION: u32 = 1;
 
@@ -534,7 +534,7 @@ mod tests {
 
         let loaded = PlanRegistry::load(&path).unwrap();
         let public_id = loaded.get(id).unwrap().public_id.clone();
-        assert_eq!(public_id.len(), crate::plan_ref::PUBLIC_ID_LENGTH);
+        assert_eq!(public_id.len(), crate::plan::PUBLIC_ID_LENGTH);
         assert!(
             serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&path).unwrap()).unwrap()
                 ["plans"][0]["public_id"]

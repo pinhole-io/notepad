@@ -12,13 +12,13 @@ use superglue::tools::{
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
+use super::note_ref::note_ref_for_id;
+use super::plan_ref::resolve_plan_id;
+use super::registry::{PlanFilter, PlanRegistry};
+use super::task_ref::{resolve_task_id, task_ref_for_id, task_ref_for_task};
 use crate::plan::{
     KeyFile, PlanDraft, PlanDraftTask, PlanId, PlanStatus, TaskAnchor, TaskId, TaskStatus,
 };
-use crate::plan_note_ref::note_ref_for_id;
-use crate::plan_ref::resolve_plan_id;
-use crate::plan_registry::{PlanFilter, PlanRegistry};
-use crate::plan_task_ref::{resolve_task_id, task_ref_for_id, task_ref_for_task};
 
 pub const PLAN_TOOL_NAME: &str = "plan";
 

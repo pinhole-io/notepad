@@ -1,4 +1,4 @@
-use crate::artifact::{Artifact, ArtifactId, derive_artifact_description};
+use super::types::{Artifact, ArtifactId, derive_artifact_description};
 use crate::error::ArtifactError;
 
 /// In-memory session store for markdown artifacts.

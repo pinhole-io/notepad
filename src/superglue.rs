@@ -37,9 +37,9 @@ pub struct OffloadConfig {
 /// hand back a stub for content the model can then only re-request, looping forever.
 pub const SCRATCHPAD_TOOLS: &[&str] = &[
     crate::tools::NOTEPAD_TOOL_NAME,
-    crate::artifact_tools::ARTIFACT_TOOL_NAME,
-    crate::plan_tools::PLAN_TOOL_NAME,
-    crate::life_task_tools::LIFE_TASK_TOOL_NAME,
+    crate::artifact::ARTIFACT_TOOL_NAME,
+    crate::plan::PLAN_TOOL_NAME,
+    crate::life_task::LIFE_TASK_TOOL_NAME,
     "todo",
 ];
 

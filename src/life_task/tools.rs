@@ -10,8 +10,8 @@ use time::OffsetDateTime;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+use super::registry::{LifeTaskFilter, LifeTaskRegistry};
 use crate::life_task::{LifeTaskCreate, LifeTaskId, LifeTaskStatus};
-use crate::life_task_registry::{LifeTaskFilter, LifeTaskRegistry};
 
 pub const LIFE_TASK_TOOL_NAME: &str = "task";
 

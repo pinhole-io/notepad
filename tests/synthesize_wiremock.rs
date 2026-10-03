@@ -10,7 +10,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 fn chat_opts(base_url: &str) -> ChatOptions {
     ChatOptions {
         base_url: base_url.to_string(),
-        api_key: secrecy::Secret::new("sk-test".into()),
+        api_key: secrecy::SecretString::from("sk-test"),
         model: "mock".into(),
         max_tool_rounds: 1,
         temperature: Some(0.0),
