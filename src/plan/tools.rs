@@ -113,14 +113,22 @@ pub async fn register_plan_mutation_tools(
     registry: &ToolRegistry,
     state: Arc<PlanToolState>,
 ) -> Result<(), ToolInvokeError> {
-    register_plan_tool(
-        registry,
-        Arc::new(PlanTool {
-            state,
-            mode: PlanToolMode::Agent,
-        }),
-    )
-    .await
+    register_plan_tool(registry, plan_agent_tool(state)).await
+}
+
+/// Build the `plan` tool for a host that registers SuperGlue tools itself.
+#[must_use]
+pub fn plan_agent_tool(state: Arc<PlanToolState>) -> Arc<dyn Tool> {
+    Arc::new(PlanTool {
+        state,
+        mode: PlanToolMode::Agent,
+    })
+}
+
+/// Skip a failed `plan` call and continue the turn.
+#[must_use]
+pub fn plan_tool_retry_policy() -> ToolRetryPolicy {
+    plan_tool_policy()
 }
 
 /// Build shared plan tool state.
@@ -929,6 +937,13 @@ mod tests {
 
     fn plan_tool(state: Arc<PlanToolState>, mode: PlanToolMode) -> PlanTool {
         PlanTool { state, mode }
+    }
+
+    #[tokio::test]
+    async fn plan_agent_tool_uses_plan_name() {
+        let tmp = TempDir::new().unwrap();
+        let tool = plan_agent_tool(test_state(&tmp));
+        assert_eq!(tool.spec().name, PLAN_TOOL_NAME);
     }
 
     #[tokio::test]

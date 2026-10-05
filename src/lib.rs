@@ -66,8 +66,9 @@ pub use artifact::{ArtifactHook, ArtifactToolState, artifact_tool_state, registe
 
 #[cfg(feature = "superglue")]
 pub use plan::{
-    PlanCommitHook, PlanMutateApproveFn, PlanToolState, plan_registry_state,
-    plan_registry_state_with_approve, register_plan_mutation_tools, register_plan_readonly_tools,
+    PLAN_TOOL_NAME, PlanCommitHook, PlanMutateApproveFn, PlanToolState, plan_agent_tool,
+    plan_registry_state, plan_registry_state_with_approve, plan_tool_retry_policy,
+    register_plan_mutation_tools, register_plan_readonly_tools,
 };
 
 #[cfg(feature = "synthesize")]
