@@ -38,11 +38,11 @@ pub use life_task::{
 };
 pub use notepad::Notepad;
 pub use plan::{
-    KeyFile, NoteId, PUBLIC_ID_LENGTH, Plan, PlanDraft, PlanDraftTask, PlanFilter, PlanId,
-    PlanNote, PlanProgress, PlanRegistry, PlanStatus, PlanTask, TaskId, TaskStatus, note_ref,
-    note_ref_for_id, parse_note_ref, parse_task_ref, public_id, public_id_for_plan_id,
-    render_plan_text, resolve_note_id, resolve_plan_id, resolve_task_id, task_ref, task_ref_for_id,
-    task_ref_for_task, task_status_icon,
+    KeyFile, NoteId, PUBLIC_ID_LENGTH, Plan, PlanBodyUpdate, PlanDraft, PlanDraftTask, PlanFilter,
+    PlanId, PlanNote, PlanProgress, PlanRegistry, PlanStatus, PlanTask, PlanTaskUpdate, TaskId,
+    TaskStatus, note_ref, note_ref_for_id, parse_note_ref, parse_task_ref, public_id,
+    public_id_for_plan_id, render_plan_text, resolve_note_id, resolve_plan_id, resolve_task_id,
+    task_ref, task_ref_for_id, task_ref_for_task, task_status_icon,
 };
 pub use render::{RenderFormat, RenderOpts};
 

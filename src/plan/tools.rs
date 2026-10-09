@@ -17,7 +17,8 @@ use super::plan_ref::resolve_plan_id;
 use super::registry::{PlanFilter, PlanRegistry};
 use super::task_ref::{resolve_task_id, task_ref_for_id, task_ref_for_task};
 use crate::plan::{
-    KeyFile, PlanDraft, PlanDraftTask, PlanId, PlanStatus, TaskAnchor, TaskId, TaskStatus,
+    KeyFile, PlanBodyUpdate, PlanDraft, PlanDraftTask, PlanId, PlanStatus, PlanTaskUpdate,
+    TaskAnchor, TaskId, TaskStatus,
 };
 
 pub const PLAN_TOOL_NAME: &str = "plan";
@@ -426,6 +427,8 @@ const PLAN_ACTIONS: &[&str] = &[
     "list",
     "get",
     "commit",
+    "update",
+    "delete",
     "update_task",
     "add_note",
     "set_status",
@@ -444,8 +447,8 @@ fn plan_parameters_schema(_mode: PlanToolMode) -> Value {
                 "enum": actions,
                 "description": "Plan registry action"
             },
-            "title": { "type": "string", "description": "Short plan title (commit)" },
-            "overview": { "type": "string", "description": "2-4 sentences on goal and approach (commit)" },
+            "title": { "type": "string", "description": "Short plan title (commit, update)" },
+            "overview": { "type": "string", "description": "2-4 sentences on goal and approach (commit, update, replace_overview)" },
             "key_files": {
                 "type": "array",
                 "items": {
@@ -455,20 +458,29 @@ fn plan_parameters_schema(_mode: PlanToolMode) -> Value {
                         "description": { "type": "string" }
                     },
                     "required": ["path", "description"]
-                }
+                },
+                "description": "Key files (commit, update). On update, replaces the full list when present."
             },
             "context": {
                 "type": "array",
                 "items": { "type": "string" },
-                "description": "Cross-cutting investigation findings (invariants, gotchas, patterns) not tied to one task (commit)"
+                "description": "Cross-cutting investigation findings (invariants, gotchas, patterns) not tied to one task (commit, update)"
             },
             "tasks": {
                 "type": "array",
                 "items": {
                     "type": "object",
                     "properties": {
+                        "task_id": {
+                            "type": "string",
+                            "description": "Existing task ref for update, e.g. #TASK:ID:1#. Omit to add a new task. Ignored on commit."
+                        },
                         "title": { "type": "string" },
                         "description": { "type": "string" },
+                        "status": {
+                            "type": "string",
+                            "description": "Task status on update when task_id is set: pending|in_progress|completed|skipped. Ignored on commit."
+                        },
                         "files": {
                             "type": "array",
                             "items": {
@@ -480,21 +492,21 @@ fn plan_parameters_schema(_mode: PlanToolMode) -> Value {
                                 },
                                 "required": ["path", "symbol_or_lines", "change"]
                             },
-                            "description": "Concrete file/symbol anchors for this task (commit)"
+                            "description": "Concrete file/symbol anchors for this task (commit, update)"
                         }
                     },
                     "required": ["title"]
                 },
-                "description": "Ordered executable steps (commit)"
+                "description": "Ordered executable steps (commit, update). On update, replaces the full list when present."
             },
             "verification": {
                 "type": "array",
                 "items": { "type": "string" },
-                "description": "Concrete checks to confirm success (commit)"
+                "description": "Concrete checks to confirm success (commit, update)"
             },
             "published_output": {
                 "type": "string",
-                "description": "Exact form of the user-facing deliverable: units, scale, rounding, formatting, and expected value if known. Separate from working/intermediate math."
+                "description": "Exact form of the user-facing deliverable: units, scale, rounding, formatting, and expected value if known. Separate from working/intermediate math. On update, empty string clears it."
             },
             "notes": {
                 "type": "array",
@@ -510,24 +522,26 @@ fn plan_parameters_schema(_mode: PlanToolMode) -> Value {
                      (do not use plan statuses like active for tasks)"
             },
             "limit": { "type": "integer", "description": "Max results (list)" },
-            "plan_id": { "type": "string", "description": "Public plan id from plan list, for example AB12CD34. Legacy UUIDs are accepted." },
+            "plan_id": { "type": "string", "description": "Public plan id from plan list, for example AB12CD34. Legacy UUIDs are accepted. Required for update, delete, and other mutations." },
             "task_id": { "type": "string", "description": "Task ref from plan get, e.g. #TASK:ID:1#. Required for update_task; optional for add_note (omit for plan-wide notes)." },
             "note_id": { "type": "string", "description": "Note ref from plan get, e.g. #NOTE:ID:1#." },
             "content": { "type": "string", "description": "Note content (add_note) or overview text to append (append_overview)" },
             "old_text": { "type": "string", "description": "Exact excerpt to find in the overview (replace_excerpt)" },
-            "new_text": { "type": "string", "description": "Replacement text for the excerpt (replace_excerpt)" },
-            "overview": { "type": "string", "description": "Full replacement overview text (replace_overview)" }
+            "new_text": { "type": "string", "description": "Replacement text for the excerpt (replace_excerpt)" }
         },
         "required": ["action"]
     })
 }
 
 fn plan_description(_mode: PlanToolMode) -> String {
-    "Manage saved implementation plans. Actions: list, get, commit, update_task, add_note, set_status, append_overview, replace_excerpt, replace_overview. \
+    "Manage saved implementation plans. Actions: list, get, commit, update, delete, update_task, add_note, set_status, append_overview, replace_excerpt, replace_overview. \
      Use the short public plan_id returned by list; do not invent or expose canonical UUIDs. \
      Call commit after investigation with title, overview, key_files, context, tasks (each task should include files anchors: path, symbol_or_lines, change), verification, and published_output \
      (required when the user specifies output format or units). \
-     Task refs in plan get are short refs like #TASK:ID:1# — pass those as task_id to update_task and add_note. Note refs use #NOTE:ID:1#. \
+     Use update with plan_id to rewrite the same plan in place (title, overview, key_files, context, tasks, verification, published_output). \
+     On update tasks, pass task_id refs to keep existing tasks and their status; omit task_id to add a task; omit a prior task to remove it. \
+     Use delete with plan_id to remove a saved plan. \
+     Task refs in plan get are short refs like #TASK:ID:1# — pass those as task_id to update, update_task, and add_note. Note refs use #NOTE:ID:1#. \
      Use update_task to mark tasks completed when done — batch multiple completions in one call round when possible; \
      use in_progress only for long-running tasks. Task statuses: pending|in_progress|completed|skipped (never plan status active). \
      Use set_status for plan-level draft|active|completed|paused|abandoned. \
@@ -537,6 +551,154 @@ fn plan_description(_mode: PlanToolMode) -> String {
      Use append_overview only to add brand-new overview material at the end. \
      Use add_note for supplementary plan-linked notes."
         .to_string()
+}
+
+async fn clear_get_cache(state: &PlanToolState, plan_id: PlanId) {
+    state.get_cache.lock().await.remove(&plan_id);
+}
+
+fn parse_optional_string_list(arguments: &Value, key: &str) -> Option<Vec<String>> {
+    arguments.get(key).and_then(Value::as_array).map(|arr| {
+        arr.iter()
+            .filter_map(|v| v.as_str().map(str::trim).filter(|s| !s.is_empty()))
+            .map(str::to_string)
+            .collect()
+    })
+}
+
+fn parse_key_files(arguments: &Value) -> Option<Vec<KeyFile>> {
+    arguments.get("key_files").and_then(Value::as_array).map(|arr| {
+        arr.iter()
+            .filter_map(|v| {
+                Some(KeyFile {
+                    path: v.get("path")?.as_str()?.to_string(),
+                    description: v.get("description")?.as_str()?.to_string(),
+                })
+            })
+            .collect()
+    })
+}
+
+fn parse_task_files(value: &Value) -> Vec<TaskAnchor> {
+    value
+        .get("files")
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|item| {
+                    Some(TaskAnchor {
+                        path: item.get("path")?.as_str()?.to_string(),
+                        symbol_or_lines: item.get("symbol_or_lines")?.as_str()?.to_string(),
+                        change: item.get("change")?.as_str()?.to_string(),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn parse_body_update(
+    plan: &crate::plan::Plan,
+    arguments: &Value,
+) -> Result<PlanBodyUpdate, ToolInvokeError> {
+    let title = arguments
+        .get("title")
+        .and_then(Value::as_str)
+        .map(|s| s.trim().to_string());
+    let overview = arguments
+        .get("overview")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let key_files = parse_key_files(arguments);
+    let context = parse_optional_string_list(arguments, "context");
+    let verification = parse_optional_string_list(arguments, "verification");
+    let published_output = arguments
+        .get("published_output")
+        .and_then(Value::as_str)
+        .map(|s| s.trim().to_string());
+    let tasks = match arguments.get("tasks") {
+        None => None,
+        Some(Value::Array(arr)) => {
+            let mut out = Vec::new();
+            for item in arr {
+                let title = item
+                    .get("title")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .ok_or_else(|| {
+                        tool_error(PLAN_TOOL_NAME, "each update task requires a non-empty title")
+                    })?;
+                let task_id = match item.get("task_id").and_then(Value::as_str).map(str::trim) {
+                    None | Some("") => None,
+                    Some(raw) => Some(resolve_task_id_for_plan(PLAN_TOOL_NAME, plan, raw)?),
+                };
+                let status = match item.get("status").and_then(Value::as_str).map(str::trim) {
+                    None | Some("") => None,
+                    Some(raw) => Some(parse_task_status(raw)?),
+                };
+                out.push(PlanTaskUpdate {
+                    task_id,
+                    title: title.to_string(),
+                    description: item
+                        .get("description")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    files: parse_task_files(item),
+                    status,
+                });
+            }
+            Some(out)
+        }
+        Some(_) => {
+            return Err(tool_error(
+                PLAN_TOOL_NAME,
+                "tasks must be an array when present",
+            ));
+        }
+    };
+    let update = PlanBodyUpdate {
+        title,
+        overview,
+        key_files,
+        context,
+        tasks,
+        verification,
+        published_output,
+    };
+    if update.is_empty() {
+        return Err(tool_error(
+            PLAN_TOOL_NAME,
+            "update requires at least one of title, overview, key_files, context, tasks, verification, published_output",
+        ));
+    }
+    Ok(update)
+}
+
+fn format_update_preview(plan_id: &str, update: &PlanBodyUpdate) -> String {
+    let mut lines = vec![format!("Update plan {plan_id}")];
+    if update.title.is_some() {
+        lines.push("fields: title".into());
+    }
+    if update.overview.is_some() {
+        lines.push("fields: overview".into());
+    }
+    if update.key_files.is_some() {
+        lines.push("fields: key_files".into());
+    }
+    if update.context.is_some() {
+        lines.push("fields: context".into());
+    }
+    if let Some(tasks) = &update.tasks {
+        lines.push(format!("fields: tasks ({})", tasks.len()));
+    }
+    if update.verification.is_some() {
+        lines.push("fields: verification".into());
+    }
+    if update.published_output.is_some() {
+        lines.push("fields: published_output".into());
+    }
+    lines.join("\n")
 }
 
 async fn plan_commit(state: &PlanToolState, arguments: &Value) -> Result<Value, ToolInvokeError> {
@@ -553,6 +715,95 @@ async fn plan_commit(state: &PlanToolState, arguments: &Value) -> Result<Value, 
     Ok(json!({
         "plan_id": plan_public_id(state, plan_id).await,
         "message": "plan committed to registry",
+    }))
+}
+
+async fn plan_update(state: &PlanToolState, arguments: &Value) -> Result<Value, ToolInvokeError> {
+    let plan_id = plan_id_from_args(state, arguments).await?;
+    let update = {
+        let reg = state.registry.read().await;
+        let plan = reg
+            .get(plan_id)
+            .ok_or_else(|| tool_error(PLAN_TOOL_NAME, format!("plan not found: {plan_id}")))?;
+        parse_body_update(plan, arguments)?
+    };
+
+    if let Some(gate) = &state.on_mutate_approve {
+        let public_id = plan_public_id(state, plan_id).await;
+        let preview = format_update_preview(&public_id, &update);
+        let reason = format!("Update plan {public_id}");
+        if !gate(preview, reason).await {
+            return Ok(json!({
+                "ok": false,
+                "status": "denied",
+                "plan_id": public_id,
+                "message": "update denied by user",
+            }));
+        }
+    }
+
+    {
+        let mut reg = state.registry.write().await;
+        reg.update_body(plan_id, update)
+            .map_err(|e| tool_error(PLAN_TOOL_NAME, e.to_string()))?;
+    }
+    state.save().await?;
+    clear_get_cache(state, plan_id).await;
+    state.notify_update(plan_id).await;
+    let task_refs = {
+        let reg = state.registry.read().await;
+        reg.get(plan_id)
+            .map(|plan| {
+                plan.tasks
+                    .iter()
+                    .map(|task| {
+                        json!({
+                            "id": task_ref_for_task(task),
+                            "title": task.title,
+                            "status": task.status,
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+    };
+    Ok(json!({
+        "ok": true,
+        "plan_id": plan_public_id(state, plan_id).await,
+        "tasks": task_refs,
+        "message": "plan updated",
+    }))
+}
+
+async fn plan_delete(state: &PlanToolState, arguments: &Value) -> Result<Value, ToolInvokeError> {
+    let plan_id = plan_id_from_args(state, arguments).await?;
+    let public_id = plan_public_id(state, plan_id).await;
+
+    if let Some(gate) = &state.on_mutate_approve {
+        let preview = format!("Delete plan {public_id}");
+        let reason = format!("Delete plan {public_id}");
+        if !gate(preview, reason).await {
+            return Ok(json!({
+                "ok": false,
+                "status": "denied",
+                "plan_id": public_id,
+                "message": "delete denied by user",
+            }));
+        }
+    }
+
+    let removed = {
+        let mut reg = state.registry.write().await;
+        reg.remove(plan_id)
+            .map_err(|e| tool_error(PLAN_TOOL_NAME, e.to_string()))?
+    };
+    state.save().await?;
+    clear_get_cache(state, plan_id).await;
+    Ok(json!({
+        "ok": true,
+        "plan_id": removed.public_id,
+        "title": removed.title,
+        "message": "plan deleted",
     }))
 }
 
@@ -904,6 +1155,8 @@ impl Tool for PlanTool {
             "list" => plan_list(&self.state, &arguments).await,
             "get" => plan_get(&self.state, &arguments).await,
             "commit" => plan_commit(&self.state, &arguments).await,
+            "update" => plan_update(&self.state, &arguments).await,
+            "delete" => plan_delete(&self.state, &arguments).await,
             "add_note" => plan_add_note(&self.state, &arguments).await,
             "append_overview" => plan_append_overview(&self.state, &arguments).await,
             "replace_excerpt" => plan_replace_excerpt(&self.state, &arguments).await,
@@ -1486,5 +1739,93 @@ mod tests {
         };
         assert!(message.contains("#TASK:ID:1#"));
         assert!(matches!(policy.on_error, OnToolError::Skip));
+    }
+
+    #[tokio::test]
+    async fn update_rewrites_body_on_same_plan_id() {
+        let tmp = TempDir::new().unwrap();
+        let state = test_state(&tmp);
+        let tool = plan_tool(Arc::clone(&state), PlanToolMode::Agent);
+        let committed = tool
+            .call(json!({
+                "action": "commit",
+                "title": "Original",
+                "overview": "First overview",
+                "tasks": [
+                    { "title": "Keep me" },
+                    { "title": "Drop me" }
+                ],
+                "verification": ["ok"]
+            }))
+            .await
+            .unwrap();
+        let plan_id = committed["plan_id"].as_str().unwrap().to_string();
+        tool.call(json!({
+            "action": "update_task",
+            "plan_id": plan_id,
+            "task_id": "#TASK:ID:1#",
+            "status": "completed"
+        }))
+        .await
+        .unwrap();
+
+        let updated = tool
+            .call(json!({
+                "action": "update",
+                "plan_id": plan_id,
+                "title": "Rewritten",
+                "tasks": [
+                    { "task_id": "#TASK:ID:1#", "title": "Keep me" },
+                    { "title": "Brand new" }
+                ]
+            }))
+            .await
+            .unwrap();
+        assert_eq!(updated["plan_id"].as_str(), Some(plan_id.as_str()));
+        assert_eq!(updated["tasks"].as_array().unwrap().len(), 2);
+
+        let full = tool
+            .call(json!({ "action": "get", "plan_id": plan_id }))
+            .await
+            .unwrap();
+        assert_eq!(full["title"].as_str(), Some("Rewritten"));
+        assert_eq!(full["tasks"].as_array().unwrap().len(), 2);
+        assert_eq!(full["tasks"][0]["status"].as_str(), Some("completed"));
+        assert_eq!(full["tasks"][1]["title"].as_str(), Some("Brand new"));
+        assert_eq!(full["tasks"][1]["id"].as_str(), Some("#TASK:ID:2#"));
+    }
+
+    #[tokio::test]
+    async fn delete_removes_plan() {
+        let tmp = TempDir::new().unwrap();
+        let state = test_state(&tmp);
+        let tool = plan_tool(Arc::clone(&state), PlanToolMode::Agent);
+        let committed = tool
+            .call(json!({
+                "action": "commit",
+                "title": "Temp",
+                "overview": "O",
+                "tasks": [{ "title": "Step" }],
+                "verification": ["ok"]
+            }))
+            .await
+            .unwrap();
+        let plan_id = committed["plan_id"].as_str().unwrap().to_string();
+
+        let deleted = tool
+            .call(json!({ "action": "delete", "plan_id": plan_id }))
+            .await
+            .unwrap();
+        assert_eq!(deleted["plan_id"].as_str(), Some(plan_id.as_str()));
+
+        let listed = tool.call(json!({ "action": "list" })).await.unwrap();
+        assert_eq!(listed["count"].as_u64(), Some(0));
+
+        let err = tool
+            .call(json!({ "action": "delete", "plan_id": plan_id }))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("plan not found") || err.contains("not found"));
     }
 }

@@ -16,8 +16,8 @@ pub use registry::{PlanFilter, PlanRegistry};
 pub use render::{render_plan_text, task_status_icon};
 pub use task_ref::{parse_task_ref, resolve_task_id, task_ref, task_ref_for_id, task_ref_for_task};
 pub use types::{
-    KeyFile, NoteId, Plan, PlanDraft, PlanDraftTask, PlanId, PlanNote, PlanProgress, PlanStatus,
-    PlanTask, TaskAnchor, TaskId, TaskStatus,
+    KeyFile, NoteId, Plan, PlanBodyUpdate, PlanDraft, PlanDraftTask, PlanId, PlanNote,
+    PlanProgress, PlanStatus, PlanTask, PlanTaskUpdate, TaskAnchor, TaskId, TaskStatus,
 };
 
 #[cfg(feature = "superglue")]

@@ -8,7 +8,10 @@ use uuid::Uuid;
 
 use super::plan_ref::{public_id_for_plan_id, public_id_for_plan_id_with_attempt};
 use crate::error::PlanError;
-use crate::plan::{NoteId, Plan, PlanDraft, PlanId, PlanNote, PlanStatus, TaskId, TaskStatus};
+use crate::plan::{
+    NoteId, Plan, PlanBodyUpdate, PlanDraft, PlanDraftTask, PlanId, PlanNote, PlanStatus,
+    PlanTask, PlanTaskUpdate, TaskId, TaskStatus,
+};
 
 const REGISTRY_VERSION: u32 = 1;
 
@@ -94,15 +97,68 @@ impl PlanRegistry {
     }
 
     /// Commit a new plan from a draft; returns the assigned plan id.
+    ///
+    /// When a plan with the content-addressed id already exists and its body still
+    /// matches the draft (ignoring task status and notes), return that id.
+    /// When the id exists but the body was rewritten in place, store a new plan.
     pub fn commit(&mut self, draft: PlanDraft, session_id: Option<Uuid>) -> PlanId {
-        let plan = draft.into_plan(session_id);
-        let id = plan.id;
-        if self.get(id).is_some() {
+        let content_id = draft.content_id();
+        if let Some(existing) = self.get(content_id) {
+            if plan_body_matches_draft(existing, &draft) {
+                return content_id;
+            }
+            let plan = draft.into_plan_with_id(session_id, PlanId::new_v4());
+            let id = plan.id;
+            self.plans.push(plan);
+            self.ensure_public_ids();
             return id;
         }
+        let plan = draft.into_plan(session_id);
+        let id = plan.id;
         self.plans.push(plan);
         self.ensure_public_ids();
         id
+    }
+
+    /// Rewrite selected body fields on an existing plan. Keeps [`PlanId`] and `public_id`.
+    pub fn update_body(&mut self, id: PlanId, update: PlanBodyUpdate) -> Result<(), PlanError> {
+        if update.is_empty() {
+            return Err(PlanError::InvalidDraft(
+                "update requires at least one of title, overview, key_files, context, tasks, verification, published_output"
+                    .into(),
+            ));
+        }
+        let plan = self
+            .get_mut(id)
+            .ok_or_else(|| PlanError::PlanNotFound(id.to_string()))?;
+
+        if let Some(title) = update.title {
+            let title = title.trim().to_string();
+            if title.is_empty() {
+                return Err(PlanError::InvalidDraft("title must not be empty".into()));
+            }
+            plan.title = title;
+        }
+        if let Some(overview) = update.overview {
+            plan.overview = overview;
+        }
+        if let Some(key_files) = update.key_files {
+            plan.key_files = key_files;
+        }
+        if let Some(context) = update.context {
+            plan.context = context;
+        }
+        if let Some(verification) = update.verification {
+            plan.verification = verification;
+        }
+        if let Some(published_output) = update.published_output {
+            plan.published_output = published_output;
+        }
+        if let Some(tasks) = update.tasks {
+            apply_task_updates(plan, tasks)?;
+        }
+        plan.updated_at = OffsetDateTime::now_utc();
+        Ok(())
     }
 
     #[must_use]
@@ -337,6 +393,103 @@ impl PlanRegistry {
     }
 }
 
+/// Compare draft identity fields to a stored plan. Task status and notes are ignored.
+fn plan_body_matches_draft(plan: &Plan, draft: &PlanDraft) -> bool {
+    plan.title == draft.title
+        && plan.overview == draft.overview
+        && plan.key_files == draft.key_files
+        && plan.context == draft.context
+        && plan.verification == draft.verification
+        && plan.published_output == draft.published_output
+        && plan.tasks.len() == draft.tasks.len()
+        && plan.tasks.iter().zip(draft.tasks.iter()).all(|(task, draft_task)| {
+            task_matches_draft(task, draft_task)
+        })
+}
+
+fn task_matches_draft(task: &PlanTask, draft: &PlanDraftTask) -> bool {
+    task.title == draft.title && task.description == draft.description && task.files == draft.files
+}
+
+fn apply_task_updates(plan: &mut Plan, updates: Vec<PlanTaskUpdate>) -> Result<(), PlanError> {
+    if updates.is_empty() {
+        return Err(PlanError::InvalidDraft(
+            "tasks must contain at least one item".into(),
+        ));
+    }
+
+    let mut seen = HashSet::new();
+    let mut next_tasks = Vec::with_capacity(updates.len());
+    let mut kept_ids = HashSet::new();
+
+    for (order, update) in updates.into_iter().enumerate() {
+        let title = update.title.trim().to_string();
+        if title.is_empty() {
+            return Err(PlanError::InvalidDraft(
+                "task title must not be empty".into(),
+            ));
+        }
+        let task = match update.task_id {
+            Some(task_id) => {
+                if !seen.insert(task_id) {
+                    return Err(PlanError::InvalidDraft(format!(
+                        "duplicate task_id in update: {task_id}"
+                    )));
+                }
+                let existing = plan
+                    .tasks
+                    .iter()
+                    .find(|task| task.id == task_id)
+                    .ok_or_else(|| PlanError::TaskNotFound(task_id.to_string()))?;
+                kept_ids.insert(task_id);
+                let status = update.status.unwrap_or(existing.status);
+                let completed_at = match status {
+                    TaskStatus::Completed => existing
+                        .completed_at
+                        .or_else(|| Some(OffsetDateTime::now_utc())),
+                    _ => None,
+                };
+                PlanTask {
+                    id: task_id,
+                    title,
+                    description: update.description,
+                    files: update.files,
+                    status,
+                    order,
+                    completed_at,
+                }
+            }
+            None => {
+                if update.status.is_some() {
+                    return Err(PlanError::InvalidDraft(
+                        "status is only valid with task_id on an existing task".into(),
+                    ));
+                }
+                PlanTask {
+                    id: TaskId::new_v4(),
+                    title,
+                    description: update.description,
+                    files: update.files,
+                    status: TaskStatus::Pending,
+                    order,
+                    completed_at: None,
+                }
+            }
+        };
+        next_tasks.push(task);
+    }
+
+    for note in &mut plan.notes {
+        if let Some(task_id) = note.task_id
+            && !kept_ids.contains(&task_id)
+        {
+            note.task_id = None;
+        }
+    }
+    plan.tasks = next_tasks;
+    Ok(())
+}
+
 fn normalize_ws(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
@@ -377,7 +530,7 @@ fn find_normalized_span(haystack: &str, needle: &str) -> Option<(usize, usize)> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plan::{KeyFile, PlanDraftTask};
+    use crate::plan::{KeyFile, PlanBodyUpdate, PlanDraftTask, PlanTaskUpdate, TaskStatus};
     use tempfile::TempDir;
 
     fn sample_draft(title: &str) -> PlanDraft {
@@ -481,6 +634,133 @@ mod tests {
 
         assert_eq!(first, second);
         assert_eq!(reg.plans().len(), 1);
+    }
+
+    #[test]
+    fn commit_after_body_edit_creates_second_plan() {
+        let mut reg = PlanRegistry::new();
+        let draft = sample_draft("Original");
+        let first = reg.commit(draft.clone(), None);
+        reg.update_body(
+            first,
+            PlanBodyUpdate {
+                title: Some("Rewritten".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let second = reg.commit(draft, None);
+        assert_ne!(first, second);
+        assert_eq!(reg.plans().len(), 2);
+        assert_eq!(reg.get(first).unwrap().title, "Rewritten");
+        assert_eq!(reg.get(second).unwrap().title, "Original");
+    }
+
+    #[test]
+    fn commit_after_task_status_change_stays_idempotent() {
+        let mut reg = PlanRegistry::new();
+        let draft = sample_draft("Status only");
+        let id = reg.commit(draft.clone(), None);
+        let task_id = reg.get(id).unwrap().tasks[0].id;
+        reg.update_task_status(id, task_id, TaskStatus::Completed)
+            .unwrap();
+
+        let again = reg.commit(draft, None);
+        assert_eq!(again, id);
+        assert_eq!(reg.plans().len(), 1);
+    }
+
+    #[test]
+    fn update_body_rewrites_in_place() {
+        let mut reg = PlanRegistry::new();
+        let id = reg.commit(sample_draft("Keep id"), None);
+        let public_id = reg.get(id).unwrap().public_id.clone();
+        let first_task = reg.get(id).unwrap().tasks[0].id;
+        reg.update_task_status(id, first_task, TaskStatus::Completed)
+            .unwrap();
+        reg.add_note(id, "task note".into(), Some(first_task))
+            .unwrap();
+
+        reg.update_body(
+            id,
+            PlanBodyUpdate {
+                title: Some("New title".into()),
+                tasks: Some(vec![
+                    PlanTaskUpdate {
+                        task_id: Some(first_task),
+                        title: "Kept task".into(),
+                        description: Some("updated".into()),
+                        files: vec![],
+                        status: None,
+                    },
+                    PlanTaskUpdate {
+                        task_id: None,
+                        title: "New task".into(),
+                        description: None,
+                        files: vec![],
+                        status: None,
+                    },
+                ]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let plan = reg.get(id).unwrap();
+        assert_eq!(plan.id, id);
+        assert_eq!(plan.public_id, public_id);
+        assert_eq!(plan.title, "New title");
+        assert_eq!(plan.tasks.len(), 2);
+        assert_eq!(plan.tasks[0].id, first_task);
+        assert_eq!(plan.tasks[0].status, TaskStatus::Completed);
+        assert_eq!(plan.tasks[0].title, "Kept task");
+        assert_eq!(plan.tasks[1].title, "New task");
+        assert_eq!(plan.tasks[1].status, TaskStatus::Pending);
+        assert_eq!(plan.notes[0].task_id, Some(first_task));
+    }
+
+    #[test]
+    fn update_body_detaches_notes_for_removed_tasks() {
+        let mut reg = PlanRegistry::new();
+        let draft = PlanDraft {
+            tasks: vec![
+                PlanDraftTask {
+                    title: "Keep".into(),
+                    description: None,
+                    files: vec![],
+                },
+                PlanDraftTask {
+                    title: "Drop".into(),
+                    description: None,
+                    files: vec![],
+                },
+            ],
+            ..sample_draft("Notes")
+        };
+        let id = reg.commit(draft, None);
+        let keep = reg.get(id).unwrap().tasks[0].id;
+        let drop = reg.get(id).unwrap().tasks[1].id;
+        reg.add_note(id, "on drop".into(), Some(drop)).unwrap();
+
+        reg.update_body(
+            id,
+            PlanBodyUpdate {
+                tasks: Some(vec![PlanTaskUpdate {
+                    task_id: Some(keep),
+                    title: "Keep".into(),
+                    description: None,
+                    files: vec![],
+                    status: None,
+                }]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let plan = reg.get(id).unwrap();
+        assert_eq!(plan.tasks.len(), 1);
+        assert!(plan.notes[0].task_id.is_none());
     }
 
     #[test]

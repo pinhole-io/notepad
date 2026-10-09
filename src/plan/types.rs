@@ -254,6 +254,55 @@ pub struct PlanDraftTask {
     pub files: Vec<TaskAnchor>,
 }
 
+/// Task input for an in-place plan body update.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PlanTaskUpdate {
+    /// Existing task to keep. Omit to add a new task.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<TaskId>,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<TaskAnchor>,
+    /// When set, replaces the task status. Otherwise the prior status stays.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<TaskStatus>,
+}
+
+/// Partial body rewrite for an existing plan. Omitted fields stay unchanged.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct PlanBodyUpdate {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overview: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_files: Option<Vec<KeyFile>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tasks: Option<Vec<PlanTaskUpdate>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verification: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub published_output: Option<String>,
+}
+
+impl PlanBodyUpdate {
+    /// True when every field is omitted.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.title.is_none()
+            && self.overview.is_none()
+            && self.key_files.is_none()
+            && self.context.is_none()
+            && self.tasks.is_none()
+            && self.verification.is_none()
+            && self.published_output.is_none()
+    }
+}
+
 /// Structured plan payload supplied by the agent via `plan_commit`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlanDraft {
@@ -336,10 +385,21 @@ impl PlanDraft {
         .expect("plan draft canonical serialization cannot fail")
     }
 
+    /// Content-addressed plan id for this draft.
+    #[must_use]
+    pub fn content_id(&self) -> PlanId {
+        PlanId(Uuid::new_v5(&PLAN_NAMESPACE, &self.canonical_bytes()))
+    }
+
     /// Build a new [`Plan`] with content-addressed ids and default statuses.
     pub fn into_plan(self, session_id: Option<Uuid>) -> Plan {
+        let id = self.content_id();
+        self.into_plan_with_id(session_id, id)
+    }
+
+    /// Build a new [`Plan`] with an explicit id (used when content id collides).
+    pub fn into_plan_with_id(self, session_id: Option<Uuid>, id: PlanId) -> Plan {
         let now = OffsetDateTime::now_utc();
-        let id = PlanId(Uuid::new_v5(&PLAN_NAMESPACE, &self.canonical_bytes()));
         let tasks = self
             .tasks
             .into_iter()
