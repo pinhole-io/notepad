@@ -40,9 +40,9 @@ pub use notepad::Notepad;
 pub use plan::{
     KeyFile, NoteId, PUBLIC_ID_LENGTH, Plan, PlanBodyUpdate, PlanDraft, PlanDraftTask, PlanFilter,
     PlanId, PlanNote, PlanProgress, PlanRegistry, PlanStatus, PlanTask, PlanTaskUpdate, TaskId,
-    TaskStatus, note_ref, note_ref_for_id, parse_note_ref, parse_task_ref, public_id,
-    public_id_for_plan_id, render_plan_text, resolve_note_id, resolve_plan_id, resolve_task_id,
-    task_ref, task_ref_for_id, task_ref_for_task, task_status_icon,
+    TaskStatus, is_public_plan_id, note_ref, note_ref_for_id, parse_note_ref, parse_task_ref,
+    public_id, public_id_for_plan_id, render_plan_text, resolve_note_id, resolve_plan_id,
+    resolve_task_id, task_ref, task_ref_for_id, task_ref_for_task, task_status_icon,
 };
 pub use render::{RenderFormat, RenderOpts};
 
@@ -66,8 +66,8 @@ pub use artifact::{ArtifactHook, ArtifactToolState, artifact_tool_state, registe
 
 #[cfg(feature = "superglue")]
 pub use plan::{
-    PLAN_TOOL_NAME, PlanCommitHook, PlanMutateApproveFn, PlanToolState, plan_agent_tool,
-    plan_registry_state, plan_registry_state_with_approve, plan_tool_retry_policy,
+    PLAN_TOOL_NAME, PlanCatalogItem, PlanCommitHook, PlanMutateApproveFn, PlanToolState,
+    plan_agent_tool, plan_registry_state, plan_registry_state_with_approve, plan_tool_retry_policy,
     register_plan_mutation_tools, register_plan_readonly_tools,
 };
 

@@ -11,7 +11,9 @@ mod types;
 pub(crate) mod tools;
 
 pub use note_ref::{note_ref, note_ref_for_id, parse_note_ref, resolve_note_id};
-pub use plan_ref::{PUBLIC_ID_LENGTH, public_id, public_id_for_plan_id, resolve_plan_id};
+pub use plan_ref::{
+    PUBLIC_ID_LENGTH, is_public_plan_id, public_id, public_id_for_plan_id, resolve_plan_id,
+};
 pub use registry::{PlanFilter, PlanRegistry};
 pub use render::{render_plan_text, task_status_icon};
 pub use task_ref::{parse_task_ref, resolve_task_id, task_ref, task_ref_for_id, task_ref_for_task};
@@ -22,7 +24,7 @@ pub use types::{
 
 #[cfg(feature = "superglue")]
 pub use tools::{
-    PLAN_TOOL_NAME, PlanCommitHook, PlanMutateApproveFn, PlanToolState, plan_agent_tool,
-    plan_registry_state, plan_registry_state_with_approve, plan_tool_retry_policy,
+    PLAN_TOOL_NAME, PlanCatalogItem, PlanCommitHook, PlanMutateApproveFn, PlanToolState,
+    plan_agent_tool, plan_registry_state, plan_registry_state_with_approve, plan_tool_retry_policy,
     register_plan_mutation_tools, register_plan_readonly_tools,
 };

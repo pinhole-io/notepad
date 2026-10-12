@@ -63,7 +63,50 @@ pub struct PlanToolState {
     get_cache: Arc<Mutex<HashMap<PlanId, (String, Value, u32)>>>,
 }
 
+/// One saved plan, short enough to put in a prompt.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlanCatalogItem {
+    /// Public plan id.
+    pub public_id: String,
+    /// Plan title.
+    pub title: String,
+    /// `draft`, `active`, `completed`, `paused`, or `abandoned`.
+    pub status: &'static str,
+}
+
+fn status_slug(status: PlanStatus) -> &'static str {
+    match status {
+        PlanStatus::Draft => "draft",
+        PlanStatus::Active => "active",
+        PlanStatus::Completed => "completed",
+        PlanStatus::Paused => "paused",
+        PlanStatus::Abandoned => "abandoned",
+    }
+}
+
 impl PlanToolState {
+    /// Reload the registry and return the saved plans.
+    ///
+    /// A missing file leaves memory unchanged. A commit can exist in memory
+    /// before the first successful save.
+    pub async fn catalog(&self) -> Vec<PlanCatalogItem> {
+        let mut registry = self.registry.write().await;
+        if self.persist_path.exists()
+            && let Ok(fresh) = PlanRegistry::load(&self.persist_path)
+        {
+            *registry = fresh;
+        }
+        registry
+            .plans()
+            .iter()
+            .map(|plan| PlanCatalogItem {
+                public_id: plan.public_id.clone(),
+                title: plan.title.clone(),
+                status: status_slug(plan.status),
+            })
+            .collect()
+    }
+
     async fn reload_from_disk(&self) -> Result<(), ToolInvokeError> {
         let fresh = PlanRegistry::load(&self.persist_path).map_err(|e| {
             ToolInvokeError::handler(format!("failed to load plan registry: {e}"), None)
@@ -535,6 +578,7 @@ fn plan_parameters_schema(_mode: PlanToolMode) -> Value {
 
 fn plan_description(_mode: PlanToolMode) -> String {
     "Manage saved implementation plans. Actions: list, get, commit, update, delete, update_task, add_note, set_status, append_overview, replace_excerpt, replace_overview. \
+     Do not report a plan id until this tool returns it. Do not invent an id. \
      Use the short public plan_id returned by list; do not invent or expose canonical UUIDs. \
      Call commit after investigation with title, overview, key_files, context, tasks (each task should include files anchors: path, symbol_or_lines, change), verification, and published_output \
      (required when the user specifies output format or units). \
@@ -567,16 +611,19 @@ fn parse_optional_string_list(arguments: &Value, key: &str) -> Option<Vec<String
 }
 
 fn parse_key_files(arguments: &Value) -> Option<Vec<KeyFile>> {
-    arguments.get("key_files").and_then(Value::as_array).map(|arr| {
-        arr.iter()
-            .filter_map(|v| {
-                Some(KeyFile {
-                    path: v.get("path")?.as_str()?.to_string(),
-                    description: v.get("description")?.as_str()?.to_string(),
+    arguments
+        .get("key_files")
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| {
+                    Some(KeyFile {
+                        path: v.get("path")?.as_str()?.to_string(),
+                        description: v.get("description")?.as_str()?.to_string(),
+                    })
                 })
-            })
-            .collect()
-    })
+                .collect()
+        })
 }
 
 fn parse_task_files(value: &Value) -> Vec<TaskAnchor> {
@@ -627,7 +674,10 @@ fn parse_body_update(
                     .map(str::trim)
                     .filter(|s| !s.is_empty())
                     .ok_or_else(|| {
-                        tool_error(PLAN_TOOL_NAME, "each update task requires a non-empty title")
+                        tool_error(
+                            PLAN_TOOL_NAME,
+                            "each update task requires a non-empty title",
+                        )
                     })?;
                 let task_id = match item.get("task_id").and_then(Value::as_str).map(str::trim) {
                     None | Some("") => None,

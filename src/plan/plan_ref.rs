@@ -56,6 +56,22 @@ pub fn public_id(plan: &Plan) -> &str {
     &plan.public_id
 }
 
+/// True when `value` is one public plan id.
+#[must_use]
+pub fn is_public_plan_id(value: &str) -> bool {
+    let mut count = 0usize;
+    for ch in value.chars() {
+        if !ch.is_ascii() || !ALPHABET.contains(&(ch.to_ascii_uppercase() as u8)) {
+            return false;
+        }
+        count += 1;
+        if count > PUBLIC_ID_LENGTH {
+            return false;
+        }
+    }
+    count == PUBLIC_ID_LENGTH
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,6 +99,9 @@ mod tests {
         let id = PlanId(Uuid::from_u128(1));
         assert_eq!(public_id_for_plan_id(id), public_id_for_plan_id(id));
         assert_eq!(public_id_for_plan_id(id).len(), PUBLIC_ID_LENGTH);
+        assert!(is_public_plan_id(&public_id_for_plan_id(id)));
+        assert!(!is_public_plan_id("PLANNING"));
+        assert!(!is_public_plan_id("K3M9P2Q"));
     }
 
     #[test]
