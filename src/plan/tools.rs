@@ -558,11 +558,10 @@ fn plan_parameters_schema(_mode: PlanToolMode) -> Value {
             },
             "status": {
                 "type": "string",
-                "description": "Depends on action: \
-                     set_status/list → plan status: draft|active|completed|paused|abandoned \
-                     (omit or leave empty on list for all plans); \
-                     update_task → task status: pending|in_progress|completed|skipped \
-                     (do not use plan statuses like active for tasks)"
+                "description": "On set_status and list: plan status draft|active|completed|paused|abandoned \
+                     (omit or leave empty on list for all plans). \
+                     On update_task: task status pending|in_progress|completed|skipped \
+                     (do not use plan statuses like active for tasks)."
             },
             "limit": { "type": "integer", "description": "Max results (list)" },
             "plan_id": { "type": "string", "description": "Public plan id from plan list, for example AB12CD34. Legacy UUIDs are accepted. Required for update, delete, and other mutations." },
@@ -580,20 +579,21 @@ fn plan_description(_mode: PlanToolMode) -> String {
     "Manage saved implementation plans. Actions: list, get, commit, update, delete, update_task, add_note, set_status, append_overview, replace_excerpt, replace_overview. \
      Do not report a plan id until this tool returns it. Do not invent an id. \
      Use the short public plan_id returned by list; do not invent or expose canonical UUIDs. \
-     Call commit after investigation with title, overview, key_files, context, tasks (each task should include files anchors: path, symbol_or_lines, change), verification, and published_output \
+     commit creates a plan after investigation with title, overview, key_files, context, tasks \
+     (each task should include files anchors: path, symbol_or_lines, change), verification, and published_output \
      (required when the user specifies output format or units). \
-     Use update with plan_id to rewrite the same plan in place (title, overview, key_files, context, tasks, verification, published_output). \
+     update rewrites that plan in place with plan_id (title, overview, key_files, context, tasks, verification, published_output). \
      On update tasks, pass task_id refs to keep existing tasks and their status; omit task_id to add a task; omit a prior task to remove it. \
-     Use delete with plan_id to remove a saved plan. \
+     replace_overview replaces the whole overview (overview=<entire new overview>) and prompts for approval. \
+     replace_excerpt changes one exact overview span (old_text + new_text) and prompts for approval. \
+     append_overview adds brand-new overview text at the end. add_note adds a supplementary plan-linked note. \
+     Do not use add_note or append_overview to rewrite existing overview text. \
+     update_task sets a task status: pending|in_progress|completed|skipped. Never use plan statuses like active for tasks. \
+     Batch task completions in one call round when possible; use in_progress only for long-running tasks. \
+     set_status sets a plan status: draft|active|completed|paused|abandoned. \
+     status means the task status on update_task and the plan status on set_status and list. \
      Task refs in plan get are short refs like #TASK:ID:1# — pass those as task_id to update, update_task, and add_note. Note refs use #NOTE:ID:1#. \
-     Use update_task to mark tasks completed when done — batch multiple completions in one call round when possible; \
-     use in_progress only for long-running tasks. Task statuses: pending|in_progress|completed|skipped (never plan status active). \
-     Use set_status for plan-level draft|active|completed|paused|abandoned. \
-     For full overview rewrites use replace_overview (overview=<entire new overview>). It prompts the user with a diff to approve. \
-     For spot edits to existing overview text use replace_excerpt (old_text + new_text). It also prompts for approval. \
-     Never use add_note or append_overview as a substitute for rewriting existing overview text. \
-     Use append_overview only to add brand-new overview material at the end. \
-     Use add_note for supplementary plan-linked notes."
+     Use delete with plan_id to remove a saved plan."
         .to_string()
 }
 
