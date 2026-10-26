@@ -9,8 +9,8 @@ use uuid::Uuid;
 use super::plan_ref::{public_id_for_plan_id, public_id_for_plan_id_with_attempt};
 use crate::error::PlanError;
 use crate::plan::{
-    NoteId, Plan, PlanBodyUpdate, PlanDraft, PlanDraftTask, PlanId, PlanNote, PlanStatus,
-    PlanTask, PlanTaskUpdate, TaskId, TaskStatus,
+    NoteId, Plan, PlanBodyUpdate, PlanDraft, PlanDraftTask, PlanId, PlanNote, PlanStatus, PlanTask,
+    PlanTaskUpdate, TaskId, TaskStatus,
 };
 
 const REGISTRY_VERSION: u32 = 1;
@@ -402,9 +402,11 @@ fn plan_body_matches_draft(plan: &Plan, draft: &PlanDraft) -> bool {
         && plan.verification == draft.verification
         && plan.published_output == draft.published_output
         && plan.tasks.len() == draft.tasks.len()
-        && plan.tasks.iter().zip(draft.tasks.iter()).all(|(task, draft_task)| {
-            task_matches_draft(task, draft_task)
-        })
+        && plan
+            .tasks
+            .iter()
+            .zip(draft.tasks.iter())
+            .all(|(task, draft_task)| task_matches_draft(task, draft_task))
 }
 
 fn task_matches_draft(task: &PlanTask, draft: &PlanDraftTask) -> bool {
