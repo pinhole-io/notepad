@@ -1,15 +1,27 @@
-# notepad-kt (Kotlin / Android)
+# notepad-kt
 
-JNI bindings to the in-process [notepad](../) Rust crate, mirroring [notepad-js](../notepad-js) and [notepad-py](../notepad-py).
+Kotlin and Android bindings for [notepad](https://github.com/pinhole-io/notepad).
+
+The surface matches [notepad-py](../notepad-py) and [notepad-js](../notepad-js). The native library is a JNI `cdylib`.
+
+This package is not on Maven Central. Build it from this repository. The parent crate needs a sibling [superglue](https://github.com/pinhole-io/superglue) checkout.
 
 ## Layout
 
-- `native/` – Rust cdylib `libnotepad_kt.so` (`notepad_kt` crate) using the `jni` crate
-- `notepad-android/` – Android library (Kotlin + Java `NotepadNativeJni`)
+| Path | Role |
+| --- | --- |
+| `native/` | Rust crate `notepad_kt`. It builds `libnotepad_kt.so`. |
+| `notepad-android/` | Android library. Package `com.notepad.kt`. |
 
-## Build native (Android)
+The AAR targets `arm64-v8a` and `x86_64`.
 
-Prerequisites: Rust, Android NDK, [`cargo-ndk`](https://github.com/bbqsrc/cargo-ndk).
+## Requirements
+
+- A Rust toolchain
+- The Android NDK
+- [`cargo-ndk`](https://github.com/bbqsrc/cargo-ndk)
+
+## Build
 
 From `notepad-kt/notepad-android`:
 
@@ -19,9 +31,15 @@ export ANDROID_NDK_HOME=/path/to/ndk
 ./gradlew :notepad-android:assembleDebug
 ```
 
-Without NDK, host tests can build a desktop `.so` via `./gradlew :notepad-android:buildRustJniHost`.
+Without an NDK, build a desktop library for host tests:
 
-## Usage
+```bash
+./gradlew :notepad-android:buildRustJniHost
+```
+
+The binding enables `superglue` and `synthesize`.
+
+## Store and render
 
 ```kotlin
 import com.notepad.kt.Notepad
@@ -30,8 +48,14 @@ import com.notepad.kt.version
 println(version())
 
 Notepad().use { np ->
-    val id = np.store("First finding from the tool loop.")
+    np.store("First finding from the tool loop.")
     println(np.sessionId)
     println(np.render())
 }
 ```
+
+Example tests: [examples/README.md](examples/README.md).
+
+## License
+
+The license is [MIT](../LICENSE).

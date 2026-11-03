@@ -12,9 +12,9 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
-license = "BSD-4-Clause"
+license = "MIT"
 
 [profile.release]
 lto = true
@@ -25,7 +25,9 @@ name = "notepad"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Session working memory for agent runs — offload context, synthesize answers"
+description = "Session working memory for agent runs"
+repository = "https://github.com/pinhole-io/notepad"
+readme = "README.md"
 rust-version = "1.88"
 
 [features]

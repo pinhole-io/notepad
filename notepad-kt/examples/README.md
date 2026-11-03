@@ -1,19 +1,27 @@
 # Examples (Kotlin)
 
-Mirror [`../notepad-py/examples/`](../notepad-py/examples/) and [`../notepad-js/examples/`](../notepad-js/examples/).
+These tests match the Python examples in [`notepad-py/examples/`](../../notepad-py/examples/) and the JavaScript examples in [`notepad-js/examples/`](../../notepad-js/examples/).
 
 ## Runnable JUnit examples
 
-Live synthesis requires `OPENAI_API_KEY` and optional `OPENAI_MODEL`:
+Live synthesis needs `OPENAI_API_KEY`. `OPENAI_MODEL` is optional.
+
+**Warning:** Keep the API key in the environment. Do not commit it.
 
 ```bash
 export OPENAI_API_KEY=sk-...
+
+# From the notepad repository root.
+cargo build --release -p notepad_kt
+mkdir -p notepad-kt/notepad-android/src/main/jniLibs/x86_64
+cp target/release/libnotepad_kt.so notepad-kt/notepad-android/src/main/jniLibs/x86_64/
+
+# From the sibling superglue repository root.
+cargo build --release -p superglue_kt
+cp target/release/libsuperglue_kt.so ../notepad/notepad-kt/notepad-android/src/main/jniLibs/x86_64/
+
+# From the notepad repository root.
 cd notepad-kt
-# Build host .so files first (when NDK unavailable):
-cd native && cargo build --release
-cp ../../target/release/libnotepad_kt.so ../notepad-android/src/main/jniLibs/x86_64/
-cd ../../superglue/superglue-kt/native && cargo build --release
-cp ../../../superglue/target/release/libsuperglue_kt.so ../../notepad/notepad-kt/notepad-android/src/main/jniLibs/x86_64/
 gradle :notepad-android:testDebugUnitTest
 ```
 

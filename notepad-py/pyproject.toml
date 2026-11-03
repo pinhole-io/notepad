@@ -4,10 +4,27 @@ build-backend = "maturin"
 
 [project]
 name = "notepad-py"
-version = "0.1.0"
+version = "1.0.0"
 description = "Python bindings for the notepad Rust core (session working memory)"
-license = "BSD-4-Clause"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
+authors = [
+    { name = "Nick", email = "nick@nyoung.dev" },
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Rust",
+]
+
+[project.urls]
+Homepage = "https://github.com/pinhole-io/notepad"
+Repository = "https://github.com/pinhole-io/notepad"
+Issues = "https://github.com/pinhole-io/notepad/issues"
 
 [tool.maturin]
 module-name = "notepad._notepad"
