@@ -425,6 +425,7 @@ fn result_has_fetched_body(value: &Value) -> bool {
     ["content", "markdown"]
         .iter()
         .any(|key| value.get(*key).and_then(Value::as_str).is_some())
+        || page_body_text(value).is_some()
 }
 
 fn extract_body_from_element(value: &Value) -> Option<OffloadBody> {
@@ -432,8 +433,12 @@ fn extract_body_from_element(value: &Value) -> Option<OffloadBody> {
         return None;
     }
 
-    if let Some(content) = value.get("content").and_then(Value::as_str) {
-        if content.trim().is_empty() || is_low_signal_web_text(content) {
+    if let Some(content) = usable_text_field(value, "content")
+        .or_else(|| usable_text_field(value, "markdown"))
+        .or_else(|| page_body_text(value))
+    {
+        // Empty means a body field was present but unusable. Do not store the envelope.
+        if content.is_empty() {
             return None;
         }
         let meta = identity_fields_from_value(value);
@@ -454,6 +459,43 @@ fn extract_body_from_element(value: &Value) -> Option<OffloadBody> {
         preview_source: serialized,
         meta: identity_fields_from_value(value),
     })
+}
+
+/// Page text from a fetch envelope (`text` plus `url` or `content_type`).
+///
+/// Returns `None` when the field is absent. An empty or low-signal body is
+/// `Some("")` so the caller does not store the JSON envelope instead.
+fn page_body_text(value: &Value) -> Option<&str> {
+    let text = value.get("text").and_then(Value::as_str)?;
+    if !is_page_envelope(value) {
+        return None;
+    }
+    if text.trim().is_empty() || is_low_signal_web_text(text) {
+        return Some("");
+    }
+    Some(text)
+}
+
+fn is_page_envelope(value: &Value) -> bool {
+    value.get("url").and_then(Value::as_str).is_some()
+        || value
+            .get("content_type")
+            .and_then(Value::as_str)
+            .is_some_and(|content_type| {
+                let lower = content_type.to_ascii_lowercase();
+                lower.contains("html")
+                    || lower.contains("markdown")
+                    || lower.contains("text/plain")
+                    || lower.contains("xhtml")
+            })
+}
+
+fn usable_text_field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+    let text = value.get(key).and_then(Value::as_str)?;
+    if text.trim().is_empty() || is_low_signal_web_text(text) {
+        return Some("");
+    }
+    Some(text)
 }
 
 fn identity_fields_from_value(value: &Value) -> HashMap<String, Value> {
@@ -719,6 +761,36 @@ mod tests {
             StoredPayload::Json(_) => panic!("expected unwrapped text payload"),
         }
         assert!(body.preview_source.starts_with("Butter Chicken"));
+    }
+
+    #[test]
+    fn fetch_text_field_stores_markdown_not_envelope() {
+        let article = long_article();
+        let raw = serde_json::json!({
+            "ok": true,
+            "status": 200,
+            "url": "https://investors.example.com/release",
+            "content_type": "text/markdown",
+            "text": article,
+            "truncated": false,
+        })
+        .to_string();
+        let body = extract_offload_bodies(&raw)
+            .into_iter()
+            .next()
+            .expect("should offload");
+        match body.payload {
+            StoredPayload::Text(text) => {
+                assert!(text.starts_with("Butter Chicken"));
+                assert!(!text.contains("content_type"));
+                assert!(!text.contains("\"ok\""));
+            }
+            StoredPayload::Json(_) => panic!("expected markdown text, not the fetch envelope"),
+        }
+        assert_eq!(
+            body.meta.get("url").and_then(Value::as_str),
+            Some("https://investors.example.com/release")
+        );
     }
 
     #[test]
