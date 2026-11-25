@@ -4,7 +4,7 @@ Kotlin and Android bindings for [notepad](https://github.com/pinhole-io/notepad)
 
 The surface matches [notepad-py](../notepad-py) and [notepad-js](../notepad-js). The native library is a JNI `cdylib`.
 
-This package is not on Maven Central. Build it from this repository. The parent crate needs a sibling [superglue](https://github.com/pinhole-io/superglue) checkout.
+This package is not on Maven Central. Build it from this repository. Cargo fetches [superglue](https://github.com/pinhole-io/superglue) from git. Gradle integration tests still use a sibling `superglue` checkout.
 
 ## Layout
 

@@ -4,13 +4,12 @@ Python bindings for the [notepad](https://github.com/pinhole-io/notepad) Rust co
 
 The import name is `notepad`. The package name is `notepad-py`.
 
-This package is not on PyPI. Build it from this repository. The parent crate needs a sibling [superglue](https://github.com/pinhole-io/superglue) checkout.
+This package is not on PyPI. Build it from this repository. Cargo fetches [superglue](https://github.com/pinhole-io/superglue) from git.
 
 ## Requirements
 
 - Python 3.12 or newer
 - A Rust toolchain
-- The notepad repository and SuperGlue as siblings
 
 ## Build
 

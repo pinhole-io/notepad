@@ -16,6 +16,9 @@ version = "1.0.0"
 edition = "2024"
 license = "MIT"
 
+[workspace.dependencies]
+superglue = { git = "https://github.com/pinhole-io/superglue", branch = "main" }
+
 [profile.release]
 lto = true
 strip = true
@@ -48,12 +51,11 @@ time = { version = "0.3", features = ["formatting", "parsing", "serde"] }
 uuid = { version = "1", features = ["v4", "v5", "serde"] }
 
 async-trait = { version = "0.1", optional = true }
-superglue = { path = "../superglue" }
+superglue.workspace = true
 tokio = { version = "1", features = ["sync"], optional = true }
 
 [dev-dependencies]
 secrecy = "0.10"
-superglue = { path = "../superglue" }
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 wiremock = "0.6"

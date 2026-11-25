@@ -2,7 +2,7 @@
 
 Node.js bindings for [notepad](https://github.com/pinhole-io/notepad) through [napi-rs](https://napi.rs/).
 
-This package is not published to npm. Build it from this repository. The parent crate needs a sibling [superglue](https://github.com/pinhole-io/superglue) checkout.
+This package is not published to npm. Build it from this repository. Cargo fetches [superglue](https://github.com/pinhole-io/superglue) from git. The `superglue_integration` test still uses a sibling `superglue` checkout.
 
 ## Requirements
 

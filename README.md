@@ -31,25 +31,16 @@ Release `1.0.0`. Every package uses `[workspace.package].version` in [Cargo.toml
 ## Requirements
 
 - Rust 1.88 or newer. `rust-version` in `Cargo.toml` sets this floor.
-- A sibling checkout of [superglue](https://github.com/pinhole-io/superglue). Cargo resolves `path = "../superglue"` even when the `superglue` feature is off.
+- Network access on the first build so Cargo can fetch [superglue](https://github.com/pinhole-io/superglue) from git.
 - `OPENAI_API_KEY` when you call `NotepadSynthesizer`.
 
 ## Install
 
-There is no crates.io package. Clone the two repositories as siblings.
+There is no crates.io package. Clone this repository. Cargo fetches [superglue](https://github.com/pinhole-io/superglue) from git.
 
 ```bash
-mkdir -p ~/src && cd ~/src
 git clone https://github.com/pinhole-io/notepad.git
-git clone https://github.com/pinhole-io/superglue.git
-```
-
-You need this layout:
-
-```text
-~/src/
-  notepad/
-  superglue/
+cd notepad
 ```
 
 | Surface | Where it runs | How to build |
@@ -59,14 +50,13 @@ You need this layout:
 | JavaScript | Node.js 18 or newer | `notepad-js/` |
 | Kotlin | Android JNI (`arm64-v8a`, `x86_64`) | `notepad-kt/` |
 
-The binding crates enable `superglue` and `synthesize` by default. They need the sibling SuperGlue checkout.
+The binding crates enable `superglue` and `synthesize` by default. Cross-binding integration tests for `notepad-js` and `notepad-kt` still expect a sibling `superglue` checkout.
 
 ## Quick start
 
-`notepad_demo` does not call a model. The sibling checkout is still required.
+`notepad_demo` does not call a model.
 
 ```bash
-cd notepad
 cargo test
 cargo run --example notepad_demo
 ```
@@ -135,8 +125,8 @@ Keep the API key in the environment. Do not commit it.
 
 | What you see | What to do |
 | --- | --- |
-| `can't find crate superglue` | Clone SuperGlue next to this repository. See [Install](#install). |
-| `notepad_demo` still fails to build | The example does not call a model. The path dependency is still required. |
+| `can't find crate superglue` or git fetch fails | Allow Cargo to reach `https://github.com/pinhole-io/superglue`, then run `cargo fetch`. |
+| `notepad_demo` fails to build offline | Run `cargo fetch` once with network access so Cargo caches `superglue`. |
 | Synthesis cannot find a key | Export `OPENAI_API_KEY`, or pass the key to the synthesizer. |
 | Python cannot import `notepad` | Run `uvx maturin develop --release` in `notepad-py/`. |
 | Node cannot load `notepad-js` | Run `npm run build` in `notepad-js/`. |
